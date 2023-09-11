@@ -22,30 +22,20 @@ type User struct {
 	Is_vendor   bool   `json:"is_vendor"`
 }
 
-// Pass db as a parameter to getUsers
-func getCustomers(c *gin.Context, db *sql.DB) {
-
+func getCurrentUser(c *gin.Context, db *sql.DB) {
 	c.Header("Content-Type", "application/json")
-	rows, err := db.Query("SELECT first_name, last_name, username, email, is_customer, is_vendor FROM users WHERE is_customer = true")
+	session := sessions.Default(c)
+	username := session.Get("username")
+	details := db.QueryRow("SELECT first_name, last_name, username, email, is_customer, is_vendor from users WHERE username = $1", username)
+
+	var user User
+	err := details.Scan(&user.First_name, &user.Last_name, &user.Username, &user.Email, &user.Is_customer, &user.Is_vendor)
+
 	if err != nil {
-		log.Fatal(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
 	}
-	defer rows.Close()
-
-	var customers []User
-	for rows.Next() {
-		var a User
-		err := rows.Scan(&a.First_name, &a.Last_name, &a.Username, &a.Email, &a.Is_customer, &a.Is_vendor)
-		if err != nil {
-			log.Fatal(err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
-			return
-		}
-		customers = append(customers, a)
-	}
-	c.IndentedJSON(http.StatusOK, customers)
+	c.IndentedJSON(http.StatusOK, user)
 }
 
 func createCustomer(c *gin.Context, db *sql.DB) {
@@ -81,7 +71,7 @@ func createCustomer(c *gin.Context, db *sql.DB) {
 		return
 	}
 
-	c.IndentedJSON(http.StatusCreated, newuser)
+	c.IndentedJSON(http.StatusCreated, gin.H{"message": "Here are your details", "details": user})
 }
 
 func createVendors(c *gin.Context, db *sql.DB) {
@@ -145,6 +135,7 @@ func loginHandler(c *gin.Context, db *sql.DB) {
 		return
 	}
 	session := sessions.Default(c)
+	session.Set("username", user.Username)
 	session.Set("authenticated", true)
 	session.Save()
 	c.JSON(http.StatusOK, gin.H{"message": "Login successful", "user": user})
