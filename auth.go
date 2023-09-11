@@ -26,7 +26,7 @@ type User struct {
 func getCustomers(c *gin.Context, db *sql.DB) {
 
 	c.Header("Content-Type", "application/json")
-	rows, err := db.Query("SELECT first_name, last_name, username, email FROM customers")
+	rows, err := db.Query("SELECT first_name, last_name, username, email, is_customer, is_vendor FROM users WHERE is_customer = true")
 	if err != nil {
 		log.Fatal(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
@@ -37,7 +37,7 @@ func getCustomers(c *gin.Context, db *sql.DB) {
 	var customers []User
 	for rows.Next() {
 		var a User
-		err := rows.Scan(&a.First_name, &a.Last_name, &a.Username, &a.Email)
+		err := rows.Scan(&a.First_name, &a.Last_name, &a.Username, &a.Email, &a.Is_customer, &a.Is_vendor)
 		if err != nil {
 			log.Fatal(err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
@@ -149,6 +149,14 @@ func loginHandler(c *gin.Context, db *sql.DB) {
 	session.Save()
 	c.JSON(http.StatusOK, gin.H{"message": "Login successful", "user": user})
 
+}
+
+func handleLogout(c *gin.Context) {
+	session := sessions.Default(c)
+	session.Clear()
+	session.Save()
+
+	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
 }
 
 func authMiddleware() gin.HandlerFunc {

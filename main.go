@@ -48,9 +48,10 @@ func main() {
 	router.POST("/vendors/register", func(c *gin.Context) {
 		createVendors(c, db)
 	})
-	router.POST("/users/login", func(c *gin.Context) {
+	router.POST("/login", func(c *gin.Context) {
 		loginHandler(c, db)
 	})
+	router.POST("/logout", handleLogout)
 
 	router.Run("localhost:8080")
 
