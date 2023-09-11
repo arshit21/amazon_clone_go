@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 )
@@ -34,8 +36,10 @@ func main() {
 	}
 
 	router := gin.Default()
+	store := cookie.NewStore([]byte("c1d545ff2d75aae60f492d3e06ec0a10"))
+	router.Use(sessions.Sessions("mysession", store))
 	// Pass db as a parameter to getUsers
-	router.GET("/customers", func(c *gin.Context) {
+	router.GET("/customers", authMiddleware(), func(c *gin.Context) {
 		getCustomers(c, db)
 	})
 	router.POST("/customers/register", func(c *gin.Context) {

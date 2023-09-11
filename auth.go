@@ -5,7 +5,9 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -142,5 +144,22 @@ func loginHandler(c *gin.Context, db *sql.DB) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
 		return
 	}
+	session := sessions.Default(c)
+	session.Set("authenticated", true)
+	session.Save()
 	c.JSON(http.StatusOK, gin.H{"message": "Login successful", "user": user})
+
+}
+
+func authMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		auth := session.Get("authenticated")
+		if auth != nil && auth.(bool) {
+			c.Next()
+		} else {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			c.Abort()
+		}
+	}
 }
