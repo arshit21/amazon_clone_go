@@ -54,7 +54,9 @@ func main() {
 		loginHandler(c, db)
 	})
 	router.POST("/logout", handleLogout)
-
+	router.POST("/vendors/add_product", authMiddleware(), func(c *gin.Context) {
+		addProduct(c, db)
+	})
 	router.Run("localhost:8080")
 
 }

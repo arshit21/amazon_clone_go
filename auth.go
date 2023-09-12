@@ -12,7 +12,6 @@ import (
 )
 
 type User struct {
-	// ID         int    `json:"id"`
 	First_name  string `json:"first_name"`
 	Last_name   string `json:"last_name"`
 	Username    string `json:"username"`
@@ -20,6 +19,7 @@ type User struct {
 	Password    string `json:"password"`
 	Is_customer bool   `json:"is_customer"`
 	Is_vendor   bool   `json:"is_vendor"`
+	ID          int    `json:"id"`
 }
 
 func getCurrentUser(c *gin.Context, db *sql.DB) {
@@ -27,10 +27,10 @@ func getCurrentUser(c *gin.Context, db *sql.DB) {
 	session := sessions.Default(c)
 	username := session.Get("username")
 
-	details := db.QueryRow("SELECT first_name, last_name, username, email, is_customer, is_vendor from users WHERE username = $1", username)
+	details := db.QueryRow("SELECT id, first_name, last_name, username, email, is_customer, is_vendor from users WHERE username = $1", username)
 
 	var user User
-	err := details.Scan(&user.First_name, &user.Last_name, &user.Username, &user.Email, &user.Is_customer, &user.Is_vendor)
+	err := details.Scan(&user.ID, &user.First_name, &user.Last_name, &user.Username, &user.Email, &user.Is_customer, &user.Is_vendor)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
@@ -44,10 +44,10 @@ func UpdateMyDetails(c *gin.Context, db *sql.DB) {
 	session := sessions.Default(c)
 	username := session.Get("username")
 
-	details := db.QueryRow("SELECT first_name, last_name, username, email, is_customer, is_vendor from users WHERE username = $1", username)
+	details := db.QueryRow("SELECT id, first_name, last_name, username, email, is_customer, is_vendor from users WHERE username = $1", username)
 
 	var user User
-	error := details.Scan(&user.First_name, &user.Last_name, &user.Username, &user.Email, &user.Is_customer, &user.Is_vendor)
+	error := details.Scan(&user.ID, &user.First_name, &user.Last_name, &user.Username, &user.Email, &user.Is_customer, &user.Is_vendor)
 	if error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
@@ -79,7 +79,22 @@ func UpdateMyDetails(c *gin.Context, db *sql.DB) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 		return
 	}
-
+	if user.Is_customer {
+		_, err_ := db.Exec("UPDATE customers SET first_name = $1, last_name = $2, username = $3, email = $4 WHERE username = $5", updatedUser.First_name, updatedUser.Last_name, updatedUser.Username, updatedUser.Email, username)
+		if err_ != nil {
+			log.Fatal(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+			return
+		}
+	}
+	if user.Is_vendor {
+		_, _err_ := db.Exec("UPDATE vendors SET first_name = $1, last_name = $2, username = $3, email = $4 WHERE username = $5", updatedUser.First_name, updatedUser.Last_name, updatedUser.Username, updatedUser.Email, username)
+		if _err_ != nil {
+			log.Fatal(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+			return
+		}
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "User details updated successfully"})
 }
 
@@ -168,7 +183,7 @@ func loginHandler(c *gin.Context, db *sql.DB) {
 
 	var user User
 	err := db.QueryRow("SELECT * FROM users WHERE username = $1", loginRequest.Username).
-		Scan(&user.First_name, &user.Last_name, &user.Username, &user.Email, &user.Password, &user.Is_customer, &user.Is_vendor)
+		Scan(&user.First_name, &user.Last_name, &user.Username, &user.Email, &user.Password, &user.Is_customer, &user.Is_vendor, &user.ID)
 
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username"})
