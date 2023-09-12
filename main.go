@@ -38,9 +38,11 @@ func main() {
 	router := gin.Default()
 	store := cookie.NewStore([]byte("c1d545ff2d75aae60f492d3e06ec0a10"))
 	router.Use(sessions.Sessions("mysession", store))
-	// Pass db as a parameter to getUsers
 	router.GET("/users/my_profile", authMiddleware(), func(c *gin.Context) {
 		getCurrentUser(c, db)
+	})
+	router.PATCH("users/my_profile", authMiddleware(), func(c *gin.Context) {
+		UpdateMyDetails(c, db)
 	})
 	router.POST("/customers/register", func(c *gin.Context) {
 		createCustomer(c, db)

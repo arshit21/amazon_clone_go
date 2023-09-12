@@ -26,6 +26,7 @@ func getCurrentUser(c *gin.Context, db *sql.DB) {
 	c.Header("Content-Type", "application/json")
 	session := sessions.Default(c)
 	username := session.Get("username")
+
 	details := db.QueryRow("SELECT first_name, last_name, username, email, is_customer, is_vendor from users WHERE username = $1", username)
 
 	var user User
@@ -36,6 +37,50 @@ func getCurrentUser(c *gin.Context, db *sql.DB) {
 		return
 	}
 	c.IndentedJSON(http.StatusOK, user)
+}
+
+func UpdateMyDetails(c *gin.Context, db *sql.DB) {
+	c.Header("Content-Type", "application/json")
+	session := sessions.Default(c)
+	username := session.Get("username")
+
+	details := db.QueryRow("SELECT first_name, last_name, username, email, is_customer, is_vendor from users WHERE username = $1", username)
+
+	var user User
+	error := details.Scan(&user.First_name, &user.Last_name, &user.Username, &user.Email, &user.Is_customer, &user.Is_vendor)
+	if error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+
+	var updatedUser User
+	if err := c.BindJSON(&updatedUser); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		return
+	}
+
+	if len(updatedUser.Username) == 0 {
+		updatedUser.Username = user.Username
+	}
+	if len(updatedUser.First_name) == 0 {
+		updatedUser.First_name = user.First_name
+	}
+	if len(updatedUser.Last_name) == 0 {
+		updatedUser.Last_name = user.Last_name
+	}
+	if len(updatedUser.Email) == 0 {
+		updatedUser.Email = user.Email
+	}
+
+	_, err := db.Exec("UPDATE users SET first_name = $1, last_name = $2, username = $3, email = $4 WHERE username = $5", updatedUser.First_name, updatedUser.Last_name, updatedUser.Username, updatedUser.Email, username)
+
+	if err != nil {
+		log.Fatal(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User details updated successfully"})
 }
 
 func createCustomer(c *gin.Context, db *sql.DB) {
