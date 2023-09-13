@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -30,7 +31,7 @@ func addProduct(c *gin.Context, db *sql.DB) {
 	err := details.Scan(&user.First_name, &user.Last_name, &user.Username, &user.Email, &user.Is_customer, &user.Is_vendor)
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	if !user.Is_vendor {
@@ -48,16 +49,18 @@ func addProduct(c *gin.Context, db *sql.DB) {
 	err_ := row.Scan(&vendor_id)
 
 	if err_ != nil {
-		log.Fatal(err_)
+		// Handle the error, for example:
+		fmt.Println("Error:", err)
+		return
 	}
 
-	stmt, err := db.Prepare("INSERT INTO product (title, brand, price, description, image, category, units, vendor_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)")
+	stmt, err := db.Prepare("INSERT INTO product (title, brand, price, description, category, units, vendor_id, image) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmt.Close()
 
-	if _, err := stmt.Exec(newProduct.Title, newProduct.Brand, newProduct.Price, newProduct.Description, newProduct.Image, newProduct.Category, newProduct.Units, vendor_id); err != nil {
+	if _, err := stmt.Exec(newProduct.Title, newProduct.Brand, newProduct.Price, newProduct.Description, newProduct.Category, newProduct.Units, vendor_id, newProduct.Image); err != nil {
 		log.Fatal(err)
 	}
 	c.IndentedJSON(http.StatusCreated, newProduct)
