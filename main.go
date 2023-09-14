@@ -60,6 +60,12 @@ func main() {
 	router.GET("vendors/my_products", authMiddleware(), func(c *gin.Context) {
 		getMyProducts(c, db)
 	})
+	router.GET("customers/wallet", authMiddleware(), func(c *gin.Context) {
+		getWalletDetails(c, db)
+	})
+	router.PUT("customers/wallet", authMiddleware(), func(c *gin.Context) {
+		addMoneytoWallet(c, db)
+	})
 	router.GET("products/", func(c *gin.Context) {
 		getAllProducts(c, db)
 	})

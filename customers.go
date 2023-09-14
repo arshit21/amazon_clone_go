@@ -4,8 +4,13 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
+
+type AddRequest struct {
+	ToAdd int `json:"toAdd"`
+}
 
 func getIndividualProduct(c *gin.Context, db *sql.DB) {
 	product_id := c.Param("id")
@@ -39,4 +44,57 @@ func getAllProducts(c *gin.Context, db *sql.DB) {
 		products = append(products, product)
 	}
 	c.IndentedJSON(http.StatusOK, products)
+}
+
+func getWalletDetails(c *gin.Context, db *sql.DB) {
+	session := sessions.Default(c)
+	username := session.Get("username")
+
+	var customer_id int
+	err := db.QueryRow("SELECT id FROM customers WHERE username = $1", username).Scan(&customer_id)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "You are not a customer"})
+		return
+	}
+	var wallet_balance int
+	err = db.QueryRow("SELECT balance FROM wallet WHERE customer_id = $1", customer_id).Scan(&wallet_balance)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.IndentedJSON(http.StatusOK, gin.H{"Wallet Balance": wallet_balance})
+}
+
+func addMoneytoWallet(c *gin.Context, db *sql.DB) {
+	c.Header("Content-Type", "application/json")
+	session := sessions.Default(c)
+	username := session.Get("username")
+
+	var customer_id int
+	err := db.QueryRow("SELECT id FROM customers WHERE username = $1", username).Scan(&customer_id)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "You are not a customer"})
+		return
+	}
+	var wallet_balance int
+	err = db.QueryRow("SELECT balance FROM wallet WHERE customer_id = $1", customer_id).Scan(&wallet_balance)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	var addRequest AddRequest
+	err = c.BindJSON(&addRequest)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	toAdd := addRequest.ToAdd
+	newBalance := wallet_balance + toAdd
+
+	_, err = db.Exec("UPDATE wallet SET balance = $1", newBalance)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Money has been added", "Wallet Balance": newBalance})
 }
