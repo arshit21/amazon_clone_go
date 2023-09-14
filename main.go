@@ -60,6 +60,9 @@ func main() {
 	router.GET("vendors/my_products", authMiddleware(), func(c *gin.Context) {
 		getMyProducts(c, db)
 	})
+	router.GET("products/", func(c *gin.Context) {
+		getAllProducts(c, db)
+	})
 	router.GET("products/:id", func(c *gin.Context) {
 		getIndividualProduct(c, db)
 	})
