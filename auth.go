@@ -146,6 +146,17 @@ func createCustomer(c *gin.Context, db *sql.DB) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	stmt_4, err := db.Prepare("INSERT INTO cart (cost, customer_id) VALUES ($1, $2)")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmt_4.Close()
+
+	if _, err := stmt_4.Exec(0, customer_id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.IndentedJSON(http.StatusCreated, gin.H{"message": "Here are your details", "details": newuser})
 }
 
