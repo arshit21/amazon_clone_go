@@ -32,6 +32,11 @@ type orderDetails_2 struct {
 	OrderDate time.Time
 }
 
+type shoppingCart struct {
+	Product string
+	Units   int
+}
+
 func getIndividualProduct(c *gin.Context, db *sql.DB) {
 	product_id := c.Param("id")
 	product_details := db.QueryRow("SELECT title, brand, price, description, image, category, units FROM product WHERE id = $1", product_id)
@@ -254,7 +259,7 @@ func addToCart(c *gin.Context, db *sql.DB) {
 	session := sessions.Default(c)
 	username := session.Get("username")
 	var customerId int
-	err = db.QueryRow("SELECT id from customers where username=$1", username).Scan(&customerId)
+	err = db.QueryRow("SELECT id from customers WHERE username=$1", username).Scan(&customerId)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "you are not a customer"})
 		return
@@ -303,4 +308,57 @@ func addToCart(c *gin.Context, db *sql.DB) {
 		return
 	}
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "added to cart"})
+}
+
+func viewcart(c *gin.Context, db *sql.DB) {
+	session := sessions.Default(c)
+	username := session.Get("username")
+	var customerId int
+	err := db.QueryRow("SELECT id from customers where username=$1", username).Scan(&customerId)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "you are not a customer"})
+		return
+	}
+	var cartId int
+	err = db.QueryRow("SELECT id FROM cart WHERE customer_id =$1 ", customerId).Scan(&cartId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	rows, err := db.Query("SELECT product_id, units FROM cart_object WHERE cart_id = $1", cartId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var cart_objects []shoppingCart
+	for rows.Next() {
+		var product_id int
+		var product_units int
+		err = rows.Scan(&product_id, &product_units)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		var product_title string
+		err = db.QueryRow("SELECT title FROM product WHERE id = $1", product_id).Scan(&product_title)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		var cart_object shoppingCart
+		cart_object.Product = product_title
+		cart_object.Units = product_units
+		cart_objects = append(cart_objects, cart_object)
+	}
+	var cartCost int
+	err = db.QueryRow("SELECT cost FROM cart WHERE customer_id=$1", customerId).Scan(&cartCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.IndentedJSON(http.StatusOK, gin.H{"Cart total": cartCost, "Items": cart_objects})
 }
