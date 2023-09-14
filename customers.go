@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -21,11 +22,19 @@ type orderDetails struct {
 	Product   string
 	Units     int
 	MoneyPaid int
+	OrderDate time.Time
+}
+
+type orderDetails_2 struct {
+	Product   int
+	MoneyPaid int
+	Units     int
+	OrderDate time.Time
 }
 
 func getIndividualProduct(c *gin.Context, db *sql.DB) {
 	product_id := c.Param("id")
-	product_details := db.QueryRow("Select title, brand, price, description, image, category, units FROM product WHERE id = $1", product_id)
+	product_details := db.QueryRow("SELECT title, brand, price, description, image, category, units FROM product WHERE id = $1", product_id)
 	var product Product
 
 	err := product_details.Scan(&product.Title, &product.Brand, &product.Price, &product.Description, &product.Image, &product.Category, &product.Units)
@@ -112,7 +121,7 @@ func addMoneytoWallet(c *gin.Context, db *sql.DB) {
 
 func buyNow(c *gin.Context, db *sql.DB) {
 	product_id := c.Param("id")
-	product_details := db.QueryRow("Select title, brand, price, description, image, category, units FROM product WHERE id = $1", product_id)
+	product_details := db.QueryRow("SELECT title, brand, price, description, image, category, units FROM product WHERE id = $1", product_id)
 	var product Product
 
 	err := product_details.Scan(&product.Title, &product.Brand, &product.Price, &product.Description, &product.Image, &product.Category, &product.Units)
@@ -125,7 +134,7 @@ func buyNow(c *gin.Context, db *sql.DB) {
 	session := sessions.Default(c)
 	username := session.Get("username")
 	var customerId int
-	err = db.QueryRow("select id from customers where username=$1", username).Scan(&customerId)
+	err = db.QueryRow("SELECT id from customers where username=$1", username).Scan(&customerId)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "you are not a customer"})
 		return
@@ -152,7 +161,7 @@ func buyNow(c *gin.Context, db *sql.DB) {
 		return
 	}
 
-	stmt, err := db.Prepare("Insert into orders (product_id, customer_id, money_paid, units) VALUES ($1, $2, $3, $4)")
+	stmt, err := db.Prepare("INSERT into orders (product_id, customer_id, money_paid, units) VALUES ($1, $2, $3, $4)")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -181,4 +190,45 @@ func buyNow(c *gin.Context, db *sql.DB) {
 	Order.MoneyPaid = moneyPayable
 	Order.Units = units.Units
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "Product ordered", "Order details": Order})
+}
+
+func previousOrders(c *gin.Context, db *sql.DB) {
+	session := sessions.Default(c)
+	username := session.Get("username")
+	var customerId int
+	err := db.QueryRow("SELECT id from customers where username=$1", username).Scan(&customerId)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "you are not a customer"})
+		return
+	}
+	rows, err := db.Query("SELECT product_id, money_paid, units, date_created FROM orders WHERE customer_id = $1", customerId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var orders []orderDetails
+	for rows.Next() {
+		var order_1 orderDetails_2
+		err := rows.Scan(&order_1.Product, &order_1.MoneyPaid, &order_1.Units, &order_1.OrderDate)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		product_title := db.QueryRow("SELECT title FROM product WHERE id = $1", order_1.Product)
+		var title string
+		err = product_title.Scan(&title)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		var final_order orderDetails
+		final_order.Product = title
+		final_order.MoneyPaid = order_1.MoneyPaid
+		final_order.Units = order_1.Units
+		final_order.OrderDate = order_1.OrderDate
+		orders = append(orders, final_order)
+	}
+	c.IndentedJSON(http.StatusOK, gin.H{"Here are all your Orders": orders})
 }
