@@ -129,8 +129,24 @@ func createCustomer(c *gin.Context, db *sql.DB) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "username or email already exists"})
 		return
 	}
+	var customer_id int
+	err = db.QueryRow("SELECT id FROM customers WHERE username = $1", newuser.Username).Scan(&customer_id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
-	c.IndentedJSON(http.StatusCreated, gin.H{"message": "Here are your details", "details": user})
+	stmt_3, err := db.Prepare("INSERT INTO wallet (balance, customer_id) VALUES ($1, $2)")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmt_3.Close()
+
+	if _, err := stmt_3.Exec(0, customer_id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.IndentedJSON(http.StatusCreated, gin.H{"message": "Here are your details", "details": newuser})
 }
 
 func createVendors(c *gin.Context, db *sql.DB) {
