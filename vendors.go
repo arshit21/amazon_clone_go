@@ -189,3 +189,44 @@ func updateProductDetails(c *gin.Context, db *sql.DB) {
 	c.JSON(http.StatusOK, gin.H{"message": "Product details updated succesfully", "Updated Details": updatedProduct})
 
 }
+
+func ordersForMe(c *gin.Context, db *sql.DB) {
+	session := sessions.Default(c)
+	username := session.Get("username")
+	var vendorId int
+	err := db.QueryRow("SELECT id from vendors where username=$1", username).Scan(&vendorId)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "you are not a vendor"})
+		return
+	}
+	rows, err := db.Query("SELECT product_id, money_paid, units, date_created FROM orders WHERE vendor_id = $1", vendorId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var orders []orderDetails
+	for rows.Next() {
+		var order_1 orderDetails_2
+		err := rows.Scan(&order_1.Product, &order_1.MoneyPaid, &order_1.Units, &order_1.OrderDate)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		product_title := db.QueryRow("SELECT title FROM product WHERE id = $1", order_1.Product)
+		var title string
+		err = product_title.Scan(&title)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		var final_order orderDetails
+		final_order.Product = title
+		final_order.MoneyPaid = order_1.MoneyPaid
+		final_order.Units = order_1.Units
+		final_order.OrderDate = order_1.OrderDate
+		orders = append(orders, final_order)
+	}
+	c.IndentedJSON(http.StatusOK, gin.H{"Here are all your Orders": orders})
+}

@@ -160,14 +160,20 @@ func buyNow(c *gin.Context, db *sql.DB) {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "Insufficient Wallet balance"})
 		return
 	}
+	var product_vendor_id int
+	err = db.QueryRow("SELECT vendor_id FROM product WHERE id = $1", product_id).Scan(&product_vendor_id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
-	stmt, err := db.Prepare("INSERT into orders (product_id, customer_id, money_paid, units) VALUES ($1, $2, $3, $4)")
+	stmt, err := db.Prepare("INSERT into orders (product_id, customer_id, money_paid, units, vendor_id) VALUES ($1, $2, $3, $4, $5)")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmt.Close()
 
-	if _, err := stmt.Exec(product_id, customerId, moneyPayable, units.Units); err != nil {
+	if _, err := stmt.Exec(product_id, customerId, moneyPayable, units.Units, product_vendor_id); err != nil {
 		log.Fatal(err)
 	}
 	product.Units = product.Units - units.Units
