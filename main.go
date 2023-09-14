@@ -75,6 +75,9 @@ func main() {
 	router.PATCH("products/:id", authMiddleware(), func(c *gin.Context) {
 		updateProductDetails(c, db)
 	})
+	router.POST("products/:id/buyNow", authMiddleware(), func(c *gin.Context) {
+		buyNow(c, db)
+	})
 	router.Run("localhost:8080")
 
 }

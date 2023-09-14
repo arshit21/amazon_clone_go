@@ -232,7 +232,7 @@ func authMiddleware() gin.HandlerFunc {
 		if auth != nil && auth.(bool) {
 			c.Next()
 		} else {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "You are not logged In"})
 			c.Abort()
 		}
 	}
