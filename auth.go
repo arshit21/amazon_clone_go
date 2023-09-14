@@ -47,15 +47,15 @@ func UpdateMyDetails(c *gin.Context, db *sql.DB) {
 	details := db.QueryRow("SELECT id, first_name, last_name, username, email, is_customer, is_vendor from users WHERE username = $1", username)
 
 	var user User
-	error := details.Scan(&user.ID, &user.First_name, &user.Last_name, &user.Username, &user.Email, &user.Is_customer, &user.Is_vendor)
-	if error != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+	err_ := details.Scan(&user.ID, &user.First_name, &user.Last_name, &user.Username, &user.Email, &user.Is_customer, &user.Is_vendor)
+	if err_ != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err_.Error()})
 		return
 	}
 
 	var updatedUser User
 	if err := c.BindJSON(&updatedUser); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
@@ -82,8 +82,7 @@ func UpdateMyDetails(c *gin.Context, db *sql.DB) {
 	if user.Is_customer {
 		_, err_ := db.Exec("UPDATE customers SET first_name = $1, last_name = $2, username = $3, email = $4 WHERE username = $5", updatedUser.First_name, updatedUser.Last_name, updatedUser.Username, updatedUser.Email, username)
 		if err_ != nil {
-			log.Fatal(err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err_.Error()})
 			return
 		}
 	}
@@ -95,7 +94,7 @@ func UpdateMyDetails(c *gin.Context, db *sql.DB) {
 			return
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "User details updated successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "User details updated successfully", "Updated User": updatedUser})
 }
 
 func createCustomer(c *gin.Context, db *sql.DB) {

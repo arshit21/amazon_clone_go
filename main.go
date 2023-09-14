@@ -57,6 +57,15 @@ func main() {
 	router.POST("/vendors/add_product", authMiddleware(), func(c *gin.Context) {
 		addProduct(c, db)
 	})
+	router.GET("vendors/my_products", authMiddleware(), func(c *gin.Context) {
+		getMyProducts(c, db)
+	})
+	router.GET("products/:id", func(c *gin.Context) {
+		getIndividualProduct(c, db)
+	})
+	router.PATCH("products/:id", authMiddleware(), func(c *gin.Context) {
+		updateProductDetails(c, db)
+	})
 	router.Run("localhost:8080")
 
 }
