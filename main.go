@@ -87,6 +87,9 @@ func main() {
 	router.GET("customers/cart", authMiddleware(), func(c *gin.Context) {
 		viewcart(c, db)
 	})
+	router.POST("customers/cart/buy", authMiddleware(), func(c *gin.Context) {
+		buycart(c, db)
+	})
 	router.GET("vendors/myOrders", authMiddleware(), func(c *gin.Context) {
 		ordersForMe(c, db)
 	})

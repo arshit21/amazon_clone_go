@@ -362,3 +362,116 @@ func viewcart(c *gin.Context, db *sql.DB) {
 	}
 	c.IndentedJSON(http.StatusOK, gin.H{"Cart total": cartCost, "Items": cart_objects})
 }
+
+func buycart(c *gin.Context, db *sql.DB) {
+	session := sessions.Default(c)
+	username := session.Get("username")
+	var customerId int
+	err := db.QueryRow("SELECT id from customers WHERE username=$1", username).Scan(&customerId)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "you are not a customer"})
+		return
+	}
+	var cartId int
+	err = db.QueryRow("SELECT id FROM cart WHERE customer_id =$1 ", customerId).Scan(&cartId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	rows, err := db.Query("SELECT product_id, units FROM cart_object WHERE cart_id = $1", cartId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var cartCost int
+	err = db.QueryRow("SELECT cost FROM cart WHERE customer_id=$1", customerId).Scan(&cartCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var walletBalance int
+	err = db.QueryRow("SELECT balance FROM wallet WHERE customer_id = $1", customerId).Scan(&walletBalance)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if cartCost > walletBalance {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient balance in wallet"})
+		return
+	}
+	var allOrders []orderDetails
+	for rows.Next() {
+		var product_id int
+		var product_units int
+		err = rows.Scan(&product_id, &product_units)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		product_details := db.QueryRow("SELECT title, brand, price, description, image, category, units FROM product WHERE id = $1", product_id)
+		var product Product
+
+		err := product_details.Scan(&product.Title, &product.Brand, &product.Price, &product.Description, &product.Image, &product.Category, &product.Units)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Product does not exist"})
+			return
+		}
+		money := product.Price * product_units
+
+		var product_vendor_id int
+		err = db.QueryRow("SELECT vendor_id FROM product WHERE id = $1", product_id).Scan(&product_vendor_id)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		stmt, err := db.Prepare("INSERT into orders (product_id, customer_id, money_paid, units, vendor_id) VALUES ($1, $2, $3, $4, $5)")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer stmt.Close()
+
+		if _, err := stmt.Exec(product_id, customerId, money, product_units, product_vendor_id); err != nil {
+			log.Fatal(err)
+		}
+		product.Units = product.Units - product_units
+		walletBalance = walletBalance - money
+
+		_, err = db.Exec("UPDATE wallet SET balance = $1 WHERE customer_id = $2", walletBalance, customerId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		_, err = db.Exec("UPDATE product SET units = $1 WHERE id = $2", product.Units, product_id)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		var Order orderDetails
+		Order.Product = product.Title
+		Order.MoneyPaid = money
+		Order.Units = product_units
+		allOrders = append(allOrders, Order)
+
+		_, err = db.Exec("DELETE FROM cart_object WHERE cart_id = $1", cartId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+	}
+	_, err = db.Exec("UPDATE cart SET cost = $1 WHERE customer_id = $2", 0, customerId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, allOrders)
+}
