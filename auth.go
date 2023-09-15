@@ -25,7 +25,7 @@ type User struct {
 
 // Function to get current user details
 func getCurrentUser(c *gin.Context, db *sql.DB) {
-	//get current user details stored in a cookie
+	//get current user details using gin sessions
 	session := sessions.Default(c)
 	username := session.Get("username")
 
