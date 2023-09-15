@@ -10,6 +10,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// database details
 const (
 	host     = "localhost"
 	port     = 5432
@@ -22,8 +23,6 @@ func main() {
 	// string containing all the information required to connect to our database
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
 
-	// The sql.Open() function takes two arguments - a driver name, and a string that tells that driver how to connect to our database
-	// and then returns a pointer to a sql.DB and an error.
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
 		panic(err)
@@ -34,10 +33,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
+	//Create a new gin router
 	router := gin.Default()
+
+	//setup session management and session store using appropriate packages
 	store := cookie.NewStore([]byte("c1d545ff2d75aae60f492d3e06ec0a10"))
 	router.Use(sessions.Sessions("mysession", store))
+
+	//define the api routes
 	router.GET("/users/my_profile", authMiddleware(), func(c *gin.Context) {
 		getCurrentUser(c, db)
 	})
