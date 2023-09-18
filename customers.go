@@ -653,3 +653,87 @@ func buycart(c *gin.Context, db *sql.DB) {
 	// Return the details of all ordered products in the JSON response.
 	c.JSON(http.StatusOK, allOrders)
 }
+
+func removeFromCart(c *gin.Context, db *sql.DB) {
+	// Get the user's session to retrieve their username.
+	session := sessions.Default(c)
+	username := session.Get("username")
+
+	// Initialize variables to store the customer's ID, cart ID and cart cos\
+	var customerId int
+	var cartId int
+	var cartCost int
+
+	// Query the database to get the customer's ID using their username.
+	err := db.QueryRow("SELECT id from customers WHERE username=$1", username).Scan(&customerId)
+
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "you are not a customer"})
+		return
+	}
+
+	// Query the database to retrieve the customer's cart ID.
+	err = db.QueryRow("SELECT id FROM cart WHERE customer_id =$1 ", customerId).Scan(&cartId)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Query the database to get the total cost of the items in the cart.
+	err = db.QueryRow("SELECT cost FROM cart WHERE customer_id=$1", customerId).Scan(&cartCost)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	cartObjectId := c.Param("id")
+	var cartIdCheck int
+
+	err = db.QueryRow("SELECT cart_id FROM cart_object WHERE id=$1", cartObjectId).Scan(&cartIdCheck)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Item not found"})
+		return
+	}
+
+	if cartIdCheck != cartId {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Item not in your cart"})
+		return
+	}
+
+	var product_id int
+	var quantity int
+
+	err = db.QueryRow("SELECT product_id, units FROM cart_object WHERE id = $1", cartObjectId).Scan(&product_id, &quantity)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var product_price int
+	err = db.QueryRow("SELECT price FROM product WHERE id = $1", product_id).Scan(&product_price)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	money := product_price * quantity
+	cartCost = cartCost - money
+
+	_, err = db.Exec("UPDATE cart SET cost = $1 WHERE customer_id = $2", cartCost, customerId)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err = db.Exec("DELETE FROM cart_object WHERE id = $1", cartObjectId)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"Message": "Item removed from your cart successfully"})
+}

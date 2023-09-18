@@ -96,6 +96,9 @@ func main() {
 	router.GET("vendors/myOrders", authMiddleware(), func(c *gin.Context) {
 		ordersForMe(c, db)
 	})
+	router.DELETE("customers/cart/:id", authMiddleware(), func(c *gin.Context) {
+		removeFromCart(c, db)
+	})
 	router.Run("localhost:8080")
 
 }
