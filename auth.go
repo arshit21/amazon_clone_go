@@ -265,13 +265,21 @@ func loginHandler(c *gin.Context, db *sql.DB) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
 		return
 	}
+	details_2 := db.QueryRow("SELECT id, first_name, last_name, username, email, is_customer, is_vendor from users WHERE username = $1", loginRequest.Username)
+	var newUser User
+
+	err_2 := details_2.Scan(&newUser.ID, &newUser.First_name, &newUser.Last_name, &newUser.Username, &newUser.Email, &newUser.Is_customer, &newUser.Is_vendor)
+	if err_2 != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err_2.Error()})
+		return
+	}
 
 	//set session values to store the login information
 	session := sessions.Default(c)
 	session.Set("username", user.Username)
 	session.Set("authenticated", true)
 	session.Save()
-	c.JSON(http.StatusOK, gin.H{"message": "Login successful", "user": user})
+	c.JSON(http.StatusOK, gin.H{"message": "Login successful", "user": newUser})
 
 }
 
