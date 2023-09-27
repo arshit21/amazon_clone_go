@@ -15,7 +15,7 @@ type AddRequest struct {
 }
 
 type UnitsRequest struct {
-	Units int `json:"units"`
+	Units int64 `json:"units"`
 }
 
 type orderDetails struct {
@@ -195,13 +195,13 @@ func buyNow(c *gin.Context, db *sql.DB) {
 		return
 	}
 	//check if enough units are available
-	if units.Units > product.Units {
+	if units.Units > int64(product.Units) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Out of Stock"})
 		return
 	}
 
 	//check if wallet has enough balance
-	moneyPayable := product.Price * units.Units
+	moneyPayable := product.Price * int(units.Units)
 
 	var walletBalance int
 	err = db.QueryRow("SELECT balance FROM wallet WHERE customer_id = $1", customerId).Scan(&walletBalance)
@@ -238,7 +238,7 @@ func buyNow(c *gin.Context, db *sql.DB) {
 	}
 
 	//update product units and customer wallet
-	product.Units = product.Units - units.Units
+	product.Units = product.Units - int(units.Units)
 	walletBalance = walletBalance - moneyPayable
 
 	_, err = db.Exec("UPDATE wallet SET balance = $1 WHERE customer_id = $2", walletBalance, customerId)
@@ -259,7 +259,7 @@ func buyNow(c *gin.Context, db *sql.DB) {
 	var Order orderDetails
 	Order.Product = product.Title
 	Order.MoneyPaid = moneyPayable
-	Order.Units = units.Units
+	Order.Units = int(units.Units)
 
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "Product ordered", "Order details": Order})
 }
@@ -363,7 +363,7 @@ func addToCart(c *gin.Context, db *sql.DB) {
 		return
 	}
 
-	if units.Units > product.Units {
+	if units.Units > int64(product.Units) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Out of Stock"})
 		return
 	}
@@ -377,7 +377,7 @@ func addToCart(c *gin.Context, db *sql.DB) {
 		return
 	}
 
-	moneyPayable := product.Price * units.Units
+	moneyPayable := product.Price * int(units.Units)
 
 	// Prepare an SQL statement to insert the product into the cart.
 	stmt, err := db.Prepare("INSERT INTO cart_object (product_id, customer_id, cart_id, units, money) VALUES ($1, $2, $3, $4, $5)")
