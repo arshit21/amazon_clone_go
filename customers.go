@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"log"
+	"math/big"
 	"net/http"
 	"time"
 
@@ -15,7 +16,7 @@ type AddRequest struct {
 }
 
 type UnitsRequest struct {
-	Units int64 `json:"units"`
+	Units *big.Int `json:"units"`
 }
 
 type orderDetails struct {
@@ -194,14 +195,16 @@ func buyNow(c *gin.Context, db *sql.DB) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid Request Payload"})
 		return
 	}
-	//check if enough units are available
-	if units.Units > int64(product.Units) {
+	productUnits := big.NewInt(int64(product.Units))
+
+	// Compare productUnits with units.Units
+	if units.Units.Cmp(productUnits) == 1 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Out of Stock"})
 		return
 	}
-
+	inStockUnits := int(units.Units.Int64())
 	//check if wallet has enough balance
-	moneyPayable := product.Price * int(units.Units)
+	moneyPayable := product.Price * int(inStockUnits)
 
 	var walletBalance int
 	err = db.QueryRow("SELECT balance FROM wallet WHERE customer_id = $1", customerId).Scan(&walletBalance)
@@ -233,12 +236,12 @@ func buyNow(c *gin.Context, db *sql.DB) {
 	defer stmt.Close()
 
 	// Execute the SQL statement to insert order details.
-	if _, err := stmt.Exec(product_id, customerId, moneyPayable, units.Units, product_vendor_id); err != nil {
+	if _, err := stmt.Exec(product_id, customerId, moneyPayable, inStockUnits, product_vendor_id); err != nil {
 		log.Fatal(err)
 	}
 
 	//update product units and customer wallet
-	product.Units = product.Units - int(units.Units)
+	product.Units = product.Units - int(inStockUnits)
 	walletBalance = walletBalance - moneyPayable
 
 	_, err = db.Exec("UPDATE wallet SET balance = $1 WHERE customer_id = $2", walletBalance, customerId)
@@ -259,7 +262,7 @@ func buyNow(c *gin.Context, db *sql.DB) {
 	var Order orderDetails
 	Order.Product = product.Title
 	Order.MoneyPaid = moneyPayable
-	Order.Units = int(units.Units)
+	Order.Units = inStockUnits
 
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "Product ordered", "Order details": Order})
 }
@@ -362,11 +365,14 @@ func addToCart(c *gin.Context, db *sql.DB) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid Request Payload"})
 		return
 	}
+	productUnits := big.NewInt(int64(product.Units))
 
-	if units.Units > int64(product.Units) {
+	// Compare productUnits with units.Units
+	if units.Units.Cmp(productUnits) == 1 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Out of Stock"})
 		return
 	}
+	inStockUnits := int(units.Units.Int64())
 
 	var cartId int
 
@@ -377,7 +383,7 @@ func addToCart(c *gin.Context, db *sql.DB) {
 		return
 	}
 
-	moneyPayable := product.Price * int(units.Units)
+	moneyPayable := product.Price * int(inStockUnits)
 
 	// Prepare an SQL statement to insert the product into the cart.
 	stmt, err := db.Prepare("INSERT INTO cart_object (product_id, customer_id, cart_id, units, money) VALUES ($1, $2, $3, $4, $5)")
@@ -387,7 +393,7 @@ func addToCart(c *gin.Context, db *sql.DB) {
 	defer stmt.Close()
 
 	// Execute the SQL statement to insert the product into the cart.
-	if _, err := stmt.Exec(product_id, customerId, cartId, units.Units, moneyPayable); err != nil {
+	if _, err := stmt.Exec(product_id, customerId, cartId, inStockUnits, moneyPayable); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
