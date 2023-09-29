@@ -182,7 +182,7 @@ func getMyProducts(c *gin.Context, db *sql.DB) {
 
 		// Update the image URLs to include the base URL of your server
 		for i, product := range products {
-			products[i].Image = "http://localhost:8080/images/" + filepath.Base(product.Image)
+			products[i].Image = "http://" + c.Request.Host + "/images/" + filepath.Base(product.Image)
 		}
 	}
 	c.JSON(http.StatusOK, products)

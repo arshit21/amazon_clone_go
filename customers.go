@@ -59,7 +59,7 @@ func getIndividualProduct(c *gin.Context, db *sql.DB) {
 	productDetails["brand"] = product.Brand
 	productDetails["price"] = product.Price
 	productDetails["description"] = product.Description
-	productDetails["image"] = "http://localhost:8080/images/" + filepath.Base(product.Image)
+	productDetails["image"] = "http://" + c.Request.Host + "/images/" + filepath.Base(product.Image)
 	productDetails["category"] = product.Category
 	productDetails["units"] = product.Units
 	// Respond with the product details in JSON format.
@@ -90,7 +90,7 @@ func getAllProducts(c *gin.Context, db *sql.DB) {
 
 		// Update the image URLs to include the base URL of your server
 		for i, product := range products {
-			products[i].Image = "http://localhost:8080/images/" + filepath.Base(product.Image)
+			products[i].Image = "http://" + c.Request.Host + "/images/" + filepath.Base(product.Image)
 		}
 	}
 	// Respond with the list of products in JSON format.
