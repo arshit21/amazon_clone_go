@@ -2,8 +2,13 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
+	"strconv"
+	"time"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -45,10 +50,58 @@ func addProduct(c *gin.Context, db *sql.DB) {
 		return
 	}
 
-	//create newProdut of type Product and bind the request json data to that newProduct
+	timestamp := time.Now().UnixNano() / int64(time.Millisecond)
+	imageFileName := fmt.Sprintf("image_%d.jpg", timestamp)
+	uploadPath := filepath.Join("images", imageFileName)
+
+	file, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Image upload failed"})
+		return
+	}
+	if err := c.SaveUploadedFile(file, uploadPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save uploaded image"})
+		return
+	}
+	// Create a map to hold the form data
+	formData := make(map[string]interface{})
+	formData["title"] = c.PostForm("title")
+	formData["brand"] = c.PostForm("brand")
+	formData["price"] = c.PostForm("price")
+	formData["description"] = c.PostForm("description")
+	formData["image"] = c.PostForm("image")
+	formData["category"] = c.PostForm("category")
+	formData["units"] = c.PostForm("units")
+
+	priceString := formData["price"].(string)
+	priceInt, err := strconv.Atoi(priceString)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to convert price to int"})
+		return
+	}
+	formData["price"] = priceInt
+
+	// Convert units to int
+	unitsString := formData["units"].(string)
+	unitsInt, err := strconv.Atoi(unitsString)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to convert units to int"})
+		return
+	}
+	formData["units"] = unitsInt
+
+	// Convert the map to a JSON string
+	jsonData, err := json.Marshal(formData)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Unmarshal the JSON string into a Product struct
 	var newProduct Product
-	if err := c.BindJSON(&newProduct); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+	err = json.Unmarshal(jsonData, &newProduct)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -60,6 +113,7 @@ func addProduct(c *gin.Context, db *sql.DB) {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
+	newProduct.Image = uploadPath
 
 	//prepare a SQL statement for inserting data into product table and handling any potential errors
 	stmt, err := db.Prepare("INSERT INTO product (title, brand, price, description, category, units, vendor_id, image) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)")
@@ -125,6 +179,11 @@ func getMyProducts(c *gin.Context, db *sql.DB) {
 
 		// Append the product data to the 'products' slice.
 		products = append(products, newProduct)
+
+		// Update the image URLs to include the base URL of your server
+		for i, product := range products {
+			products[i].Image = "http://localhost:8080/images/" + filepath.Base(product.Image)
+		}
 	}
 	c.JSON(http.StatusOK, products)
 }

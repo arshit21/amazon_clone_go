@@ -35,11 +35,11 @@ func main() {
 	}
 	//Create a new gin router
 	router := gin.Default()
-
 	//setup session management and session store using appropriate packages
 	store := cookie.NewStore([]byte("c1d545ff2d75aae60f492d3e06ec0a10"))
 	router.Use(sessions.Sessions("mysession", store))
 
+	router.Static("/images", "./images")
 	//define the api routes
 	router.GET("/users/my_profile", authMiddleware(), func(c *gin.Context) {
 		getCurrentUser(c, db)

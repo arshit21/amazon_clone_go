@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/big"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/gin-contrib/sessions"
@@ -52,8 +53,17 @@ func getIndividualProduct(c *gin.Context, db *sql.DB) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Product does not exist"})
 		return
 	}
+
+	productDetails := make(map[string]interface{})
+	productDetails["title"] = product.Title
+	productDetails["brand"] = product.Brand
+	productDetails["price"] = product.Price
+	productDetails["description"] = product.Description
+	productDetails["image"] = "http://localhost:8080/images/" + filepath.Base(product.Image)
+	productDetails["category"] = product.Category
+	productDetails["units"] = product.Units
 	// Respond with the product details in JSON format.
-	c.IndentedJSON(http.StatusOK, product)
+	c.IndentedJSON(http.StatusOK, productDetails)
 }
 
 func getAllProducts(c *gin.Context, db *sql.DB) {
@@ -77,6 +87,11 @@ func getAllProducts(c *gin.Context, db *sql.DB) {
 
 		// Append the product details to the 'products' slice.
 		products = append(products, product)
+
+		// Update the image URLs to include the base URL of your server
+		for i, product := range products {
+			products[i].Image = "http://localhost:8080/images/" + filepath.Base(product.Image)
+		}
 	}
 	// Respond with the list of products in JSON format.
 	c.IndentedJSON(http.StatusOK, products)
